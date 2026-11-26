@@ -24,7 +24,6 @@ typedef enum {
     LINE_INVALID
 } LineStatus;
 
-/* Bufor rośnie geometrycznie. Czas amortyzowany O(długość wiersza). */
 static LineStatus read_line(FILE *input, char **buffer, size_t *capacity)
 {
     if (*buffer == NULL) {
@@ -84,7 +83,6 @@ static void report_line_error(LineStatus status)
     }
 }
 
-/* Liczniki i k mieszczą się w size_t. Wartości zbioru korzystają z BigUInt. */
 static bool parse_size(const char *text, size_t *out)
 {
     while (isspace((unsigned char)*text)) {
@@ -142,9 +140,7 @@ static bool dataset_reserve(Dataset *dataset)
     return true;
 }
 
-/* Dzieli pojedynczy wiersz na liczby. Indeks odpowiada pozycji we wierszu.
- * Białe znaki, w tym CR z zakończenia CRLF, są separatorami.
- * Po błędzie dataset zawiera poprawnie zainicjalizowane obiekty do zwolnienia. */
+
 static BigUIntStatus parse_dataset(char *line, Dataset *dataset)
 {
     char *cursor = line;
@@ -192,8 +188,7 @@ static bool write_number(FILE *output, const BigUInt *value)
     return success;
 }
 
-/* Indeksy każdej części są już w kolejności nierosnących wartości,
- * ponieważ algorytm przydziela elementy w tej kolejności. */
+
 static bool part_precedes(const PartitionPart *a, const PartitionPart *b,
                           const Dataset *dataset)
 {
@@ -253,10 +248,6 @@ static bool write_values(FILE *output, const Dataset *dataset, const BigUInt *su
     return fputc('\n', output) != EOF;
 }
 
-/* Dla n elementów, k części, L fragmentów wartości oraz S fragmentów sumy
- * całkowitej (L,S >= 1) dodawanie sumy kosztuje O(n*S),
- * sortowanie leksykograficzne O(n*L*log k), a konwersje dziesiętne
- * O(n*L^2 + k*S^2). Pamięć pomocnicza O(k + S + L) słów. */
 static bool write_result(FILE *output, const Dataset *dataset,
                          const PartitionResult *result)
 {
