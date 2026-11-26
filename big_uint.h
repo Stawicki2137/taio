@@ -35,7 +35,6 @@ BigUIntStatus big_uint_add_assign(BigUInt *a, const BigUInt *b);
 
 BigUIntStatus big_uint_sub(BigUInt *dst, const BigUInt *a, const BigUInt *b);
 
-/* Dzieli x w miejscu przez divisor > 0 i zwraca resztę. O(1 + len). */
 size_t big_uint_div_size(BigUInt *x, size_t divisor);
 
 #endif

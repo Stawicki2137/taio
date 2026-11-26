@@ -59,7 +59,6 @@ size_t big_uint_div_size(BigUInt *x, size_t divisor)
         for (unsigned pos = 32; pos > 0; --pos) {
             uint32_t mask = UINT32_C(1) << (pos - 1);
             size_t bit = (limb & mask) != 0;
-            /* Test 2*remainder + bit >= divisor bez przepełnienia size_t. */
             size_t gap = divisor - remainder - bit;
             if (remainder >= gap) {
                 remainder -= gap;

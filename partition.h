@@ -30,10 +30,6 @@ void partition_result_free(PartitionResult *result);
 
 PartitionStatus partition_descending(const NumberItem *items, size_t n, size_t k, PartitionResult *out);
 
-/* Pierwszy podział idealny w kolejności licznika k-arnego.
- * Wejście pozostaje w oryginalnej kolejności, wynik ma elementy nierosnące.
- * Dla L >= 1 fragmentów sumy całkowitej koszt przeglądu wynosi
- * O(k^n * (n+k) * L), a pamięć dodatkowa O(n + k*L) słów. */
 PartitionStatus partition_exact(const NumberItem *items, size_t n, size_t k, PartitionResult *out);
 
 #endif

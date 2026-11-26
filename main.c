@@ -369,7 +369,6 @@ static int process_input(FILE *input, FILE *output, size_t k, bool exact)
             goto cleanup;
         }
     }
-    /* Po zadeklarowanych zbiorach dozwolone są końcowe białe znaki. */
     int ch;
     while ((ch = fgetc(input)) != EOF) {
         if (!isspace((unsigned char)ch)) {
@@ -409,8 +408,6 @@ static char *make_output_name(const char *input_name)
     return name;
 }
 
-/* Utworzenie wyłączne chroni pliki innych uruchomień programu.
- * Dopisek ".tmp.<licznik>" jest usuwany po sukcesie lub błędzie. */
 static FILE *create_temporary_output(const char *output_name, char **temporary_name)
 {
     size_t length = strlen(output_name);
