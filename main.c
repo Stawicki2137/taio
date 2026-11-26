@@ -1,8 +1,14 @@
 #include "partition.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 typedef struct {
     NumberItem *items;
@@ -174,41 +180,129 @@ static BigUIntStatus parse_dataset(char *line, Dataset *dataset)
     return BIG_UINT_OK;
 }
 
-static bool print_number(const BigUInt *value)
+static bool write_number(FILE *output, const BigUInt *value)
 {
     char *text = NULL;
     if (big_uint_to_decimal(value, &text) != BIG_UINT_OK) {
         fputs("Brak pamieci przy konwersji wyniku na zapis dziesietny.\n", stderr);
         return false;
     }
-    fputs(text, stdout);
+    bool success = fputs(text, output) != EOF;
     free(text);
-    return true;
+    return success;
 }
 
-static bool print_result(const PartitionResult *result)
+/* Indeksy każdej części są już w kolejności nierosnących wartości,
+ * ponieważ algorytm przydziela elementy w tej kolejności. */
+static bool part_precedes(const PartitionPart *a, const PartitionPart *b,
+                          const Dataset *dataset)
 {
-    for (size_t i = 0; i < result->count; ++i) {
-        const PartitionPart *part = &result->parts[i];
-        printf("Czesc %zu | indeksy", i + 1);
-        for (size_t j = 0; j < part->count; ++j) {
-            printf(" %zu", part->indices[j]);
+    size_t common = a->count < b->count ? a->count : b->count;
+    for (size_t i = 0; i < common; ++i) {
+        const BigUInt *left = &dataset->items[a->indices[i] - 1].value;
+        const BigUInt *right = &dataset->items[b->indices[i] - 1].value;
+        int order = big_uint_cmp(left, right);
+        if (order != 0) {
+            return order > 0;
         }
-        fputs(" | suma ", stdout);
-        if (!print_number(&part->sum)) {
-            return false;
-        }
-        putchar('\n');
     }
-    fputs("Roznica ", stdout);
-    if (!print_number(&result->spread)) {
+    return a->count >= b->count;
+}
+
+static void sort_parts(const PartitionPart **parts, const PartitionPart **scratch,
+                       size_t begin, size_t end, const Dataset *dataset)
+{
+    if (end - begin < 2) {
+        return;
+    }
+    size_t middle = begin + (end - begin) / 2;
+    sort_parts(parts, scratch, begin, middle, dataset);
+    sort_parts(parts, scratch, middle, end, dataset);
+    size_t left = begin;
+    size_t right = middle;
+    size_t pos = begin;
+    while (left < middle && right < end) {
+        if (part_precedes(parts[left], parts[right], dataset)) {
+            scratch[pos++] = parts[left++];
+        } else {
+            scratch[pos++] = parts[right++];
+        }
+    }
+    while (left < middle) {
+        scratch[pos++] = parts[left++];
+    }
+    while (right < end) {
+        scratch[pos++] = parts[right++];
+    }
+    memcpy(parts + begin, scratch + begin, (end - begin) * sizeof(*parts));
+}
+
+static bool write_values(FILE *output, const Dataset *dataset, const BigUInt *sum,
+                         const size_t *indices, size_t count)
+{
+    if (!write_number(output, sum)) {
         return false;
     }
-    putchar('\n');
-    return true;
+    for (size_t i = 0; i < count; ++i) {
+        size_t position = indices == NULL ? i : indices[i] - 1;
+        if (fputc(' ', output) == EOF ||
+            !write_number(output, &dataset->items[position].value)) {
+            return false;
+        }
+    }
+    return fputc('\n', output) != EOF;
 }
 
-static bool process_dataset(char *line, size_t k, size_t dataset_index)
+/* Dla n elementów, k części, L fragmentów wartości oraz S fragmentów sumy
+ * całkowitej (L,S >= 1) dodawanie sumy kosztuje O(n*S),
+ * sortowanie leksykograficzne O(n*L*log k), a konwersje dziesiętne
+ * O(n*L^2 + k*S^2). Pamięć pomocnicza O(k + S + L) słów. */
+static bool write_result(FILE *output, const Dataset *dataset,
+                         const PartitionResult *result)
+{
+    BigUInt total = BIG_UINT_INIT;
+    const PartitionPart **parts = NULL;
+    const PartitionPart **scratch = NULL;
+    bool success = false;
+    if (result->count > SIZE_MAX / sizeof(*parts)) {
+        goto memory_error;
+    }
+    parts = malloc(result->count * sizeof(*parts));
+    scratch = malloc(result->count * sizeof(*scratch));
+    if (parts == NULL || scratch == NULL) {
+        goto memory_error;
+    }
+    for (size_t i = 0; i < result->count; ++i) {
+        parts[i] = &result->parts[i];
+    }
+    sort_parts(parts, scratch, 0, result->count, dataset);
+    for (size_t i = 0; i < dataset->count; ++i) {
+        if (big_uint_add_assign(&total, &dataset->items[i].value) != BIG_UINT_OK) {
+            goto memory_error;
+        }
+    }
+    if (!write_values(output, dataset, &total, NULL, dataset->count)) {
+        goto cleanup;
+    }
+    for (size_t i = 0; i < result->count; ++i) {
+        const PartitionPart *part = parts[i];
+        if (!write_values(output, dataset, &part->sum, part->indices, part->count)) {
+            goto cleanup;
+        }
+    }
+    success = write_number(output, &result->spread) && fputc('\n', output) != EOF;
+    goto cleanup;
+
+memory_error:
+    fputs("Brak pamieci przy przygotowywaniu wyniku.\n", stderr);
+cleanup:
+    free(scratch);
+    free(parts);
+    big_uint_free(&total);
+    return success;
+}
+
+static bool process_dataset(FILE *output, char *line, size_t k, size_t dataset_index)
 {
     Dataset dataset = {NULL, 0, 0};
     PartitionResult result = PARTITION_RESULT_INIT;
@@ -224,8 +318,8 @@ static bool process_dataset(char *line, size_t k, size_t dataset_index)
     PartitionStatus status =
         partition_descending(dataset.items, dataset.count, k, &result);
     if (status == PARTITION_IMPOSSIBLE) {
-        printf("Zbior %zu\nBRAK\n\n", dataset_index);
-        success = true;
+        fprintf(stderr, "Zbior %zu: liczba elementow jest mniejsza niz k.\n",
+                dataset_index);
         goto cleanup;
     }
     if (status != PARTITION_OK) {
@@ -233,9 +327,7 @@ static bool process_dataset(char *line, size_t k, size_t dataset_index)
                 dataset_index);
         goto cleanup;
     }
-    printf("Zbior %zu\n", dataset_index);
-    success = print_result(&result);
-    putchar('\n');
+    success = write_result(output, &dataset, &result);
 
 cleanup:
     partition_result_free(&result);
@@ -243,7 +335,7 @@ cleanup:
     return success;
 }
 
-static int process_input(FILE *input, size_t k)
+static int process_input(FILE *input, FILE *output, size_t k)
 {
     char *line = NULL;
     size_t capacity = 0;
@@ -259,6 +351,9 @@ static int process_input(FILE *input, size_t k)
               stderr);
         goto cleanup;
     }
+    if (fprintf(output, "%zu %zu\n", dataset_count, k) < 0) {
+        goto cleanup;
+    }
     for (size_t i = 0; i < dataset_count; ++i) {
         status = read_line(input, &line, &capacity);
         if (status != LINE_OK) {
@@ -266,10 +361,10 @@ static int process_input(FILE *input, size_t k)
             report_line_error(status);
             goto cleanup;
         }
-        if (!process_dataset(line, k, i + 1)) {
+        if (i > 0 && fputc('\n', output) == EOF) {
             goto cleanup;
         }
-        if (ferror(stdout)) {
+        if (!process_dataset(output, line, k, i + 1)) {
             goto cleanup;
         }
     }
@@ -292,6 +387,74 @@ cleanup:
     return exit_code;
 }
 
+static char *make_output_name(const char *input_name)
+{
+    const char suffix[] = "_output.txt";
+    size_t length = strlen(input_name);
+    if (length >= 4 && input_name[length - 4] == '.' &&
+        tolower((unsigned char)input_name[length - 3]) == 't' &&
+        tolower((unsigned char)input_name[length - 2]) == 'x' &&
+        tolower((unsigned char)input_name[length - 1]) == 't') {
+        length -= 4;
+    }
+    if (length > SIZE_MAX - sizeof(suffix)) {
+        return NULL;
+    }
+    char *name = malloc(length + sizeof(suffix));
+    if (name != NULL) {
+        memcpy(name, input_name, length);
+        memcpy(name + length, suffix, sizeof(suffix));
+    }
+    return name;
+}
+
+/* Utworzenie wyłączne chroni pliki innych uruchomień programu.
+ * Dopisek ".tmp.<licznik>" jest usuwany po sukcesie lub błędzie. */
+static FILE *create_temporary_output(const char *output_name, char **temporary_name)
+{
+    size_t length = strlen(output_name);
+    size_t extra = sizeof(".tmp.") + 3 * sizeof(size_t);
+    if (length > SIZE_MAX - extra) {
+        fputs("Za dluga nazwa pliku wynikowego.\n", stderr);
+        return NULL;
+    }
+    char *name = malloc(length + extra);
+    if (name == NULL) {
+        fputs("Brak pamieci na nazwe pliku tymczasowego.\n", stderr);
+        return NULL;
+    }
+    for (size_t attempt = 0; ; ++attempt) {
+        snprintf(name, length + extra, "%s.tmp.%zu", output_name, attempt);
+        FILE *output = fopen(name, "wbx");
+        if (output != NULL) {
+            *temporary_name = name;
+            return output;
+        }
+        if (errno != EEXIST || attempt == SIZE_MAX) {
+            perror(name);
+            free(name);
+            return NULL;
+        }
+    }
+}
+
+static bool replace_output(const char *temporary_name, const char *output_name)
+{
+#ifdef _WIN32
+    if (!MoveFileExA(temporary_name, output_name, MOVEFILE_REPLACE_EXISTING)) {
+        fprintf(stderr, "Blad zapisywania pliku %s (kod Windows %lu).\n",
+                output_name, (unsigned long)GetLastError());
+        return false;
+    }
+#else
+    if (rename(temporary_name, output_name) != 0) {
+        perror(output_name);
+        return false;
+    }
+#endif
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 3) {
@@ -308,14 +471,39 @@ int main(int argc, char **argv)
         perror(argv[1]);
         return EXIT_FAILURE;
     }
-    int exit_code = process_input(input, k);
+    char *output_name = make_output_name(argv[1]);
+    if (output_name == NULL) {
+        fputs("Brak pamieci na nazwe pliku wynikowego.\n", stderr);
+        fclose(input);
+        return EXIT_FAILURE;
+    }
+    char *temporary_name = NULL;
+    FILE *output = create_temporary_output(output_name, &temporary_name);
+    if (output == NULL) {
+        free(output_name);
+        fclose(input);
+        return EXIT_FAILURE;
+    }
+    int exit_code = process_input(input, output, k);
     if (fclose(input) != 0) {
         fputs("Blad zamykania pliku wejsciowego.\n", stderr);
         exit_code = EXIT_FAILURE;
     }
-    if (fflush(stdout) == EOF || ferror(stdout)) {
-        fputs("Blad zapisu wyniku.\n", stderr);
+    if (ferror(output)) {
+        fputs("Blad zapisu pliku wynikowego.\n", stderr);
         exit_code = EXIT_FAILURE;
     }
+    if (fclose(output) != 0) {
+        perror(temporary_name);
+        exit_code = EXIT_FAILURE;
+    }
+    if (exit_code == EXIT_SUCCESS && !replace_output(temporary_name, output_name)) {
+        exit_code = EXIT_FAILURE;
+    }
+    if (exit_code != EXIT_SUCCESS && remove(temporary_name) != 0) {
+        perror(temporary_name);
+    }
+    free(temporary_name);
+    free(output_name);
     return exit_code;
 }
