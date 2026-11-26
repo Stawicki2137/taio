@@ -61,7 +61,6 @@ PartitionStatus partition_descending(const NumberItem *items, size_t n,
     if (tmp.parts == NULL) {
         goto cleanup;
     }
-    /* Jawna inicjalizacja zapewnia poprawne wskaźniki NULL w C17. */
     for (size_t i = 0; i < k; ++i) {
         tmp.parts[i] = (PartitionPart){BIG_UINT_INIT, NULL, 0, 0};
     }
@@ -80,7 +79,6 @@ PartitionStatus partition_descending(const NumberItem *items, size_t n,
 
     MinHeap heap;
     min_heap_build(&heap, entries, k);
-    /* Granice bloków po k elementów nie zmieniają kolejności przydziałów. */
     for (size_t i = k; i < n; ++i) {
         MinHeapEntry entry = min_heap_pop(&heap);
         PartitionPart *part = &tmp.parts[entry.part_index];

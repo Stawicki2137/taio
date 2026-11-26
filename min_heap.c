@@ -15,7 +15,6 @@ static bool less(MinHeapEntry a, MinHeapEntry b)
 static void sift_down(MinHeap *heap, size_t root)
 {
     MinHeapEntry entry = heap->entries[root];
-    /* root < count/2 zapewnia istnienie lewego syna i bezpieczne 2*root+1. */
     while (root < heap->count / 2) {
         size_t child = 2 * root + 1;
         if (child + 1 < heap->count &&

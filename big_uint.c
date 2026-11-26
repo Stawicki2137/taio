@@ -50,6 +50,30 @@ static void normalize(BigUInt *x)
     }
 }
 
+size_t big_uint_div_size(BigUInt *x, size_t divisor)
+{
+    size_t remainder = 0;
+    for (size_t i = x->len; i > 0; --i) {
+        uint32_t limb = x->limbs[i - 1];
+        uint32_t quotient = 0;
+        for (unsigned pos = 32; pos > 0; --pos) {
+            uint32_t mask = UINT32_C(1) << (pos - 1);
+            size_t bit = (limb & mask) != 0;
+            /* Test 2*remainder + bit >= divisor bez przepełnienia size_t. */
+            size_t gap = divisor - remainder - bit;
+            if (remainder >= gap) {
+                remainder -= gap;
+                quotient |= mask;
+            } else {
+                remainder = 2 * remainder + bit;
+            }
+        }
+        x->limbs[i - 1] = quotient;
+    }
+    normalize(x);
+    return remainder;
+}
+
 BigUIntStatus big_uint_copy(BigUInt *dst, const BigUInt *src)
 {
     if (dst == src) {
@@ -68,7 +92,6 @@ BigUIntStatus big_uint_copy(BigUInt *dst, const BigUInt *src)
     return BIG_UINT_OK;
 }
 
-/* Krok Hornera na obiekcie roboczym. Po błędzie wywołujący go zwalnia. */
 static BigUIntStatus mul_add_chunk(BigUInt *x, uint32_t factor, uint32_t chunk)
 {
     uint64_t carry = chunk;
@@ -119,7 +142,7 @@ BigUIntStatus big_uint_from_decimal(BigUInt *dst, const char *text)
         }
     }
     big_uint_free(dst);
-    *dst = tmp;  /* Przekazanie własności bufora do dst. */
+    *dst = tmp;  
     return BIG_UINT_OK;
 }
 
@@ -148,8 +171,6 @@ BigUIntStatus big_uint_add(BigUInt *dst, const BigUInt *a, const BigUInt *b)
     if (n == SIZE_MAX) {
         return BIG_UINT_NOMEM;
     }
-    /* Po rezerwacji nie ma już punktu awarii. Gdy dst jest operandem,
-     * jego len zmieniamy dopiero po odczytaniu wszystkich fragmentów. */
     BigUIntStatus status = reserve(dst, n + 1);
     if (status != BIG_UINT_OK) {
         return status;
@@ -195,7 +216,6 @@ BigUIntStatus big_uint_sub(BigUInt *dst, const BigUInt *a, const BigUInt *b)
     for (size_t i = 0; i < a->len; ++i) {
         uint64_t left = a->limbs[i];
         uint64_t right = (i < b->len ? b->limbs[i] : 0) + borrow;
-        /* Rzutowanie zachowuje dolne 32 bity, także przy pożyczce. */
         dst->limbs[i] = (uint32_t)(left - right);
         borrow = left < right;
     }
@@ -204,7 +224,6 @@ BigUIntStatus big_uint_sub(BigUInt *dst, const BigUInt *a, const BigUInt *b)
     return BIG_UINT_OK;
 }
 
-/* Dzielenie pisemne od najstarszego fragmentu. Zwraca resztę. */
 static uint32_t div_decimal_chunk(BigUInt *x)
 {
     uint64_t remainder = 0;
@@ -219,7 +238,6 @@ static uint32_t div_decimal_chunk(BigUInt *x)
 
 BigUIntStatus big_uint_to_decimal(const BigUInt *x, char **out)
 {
-    /* 2^32 < 10^10, więc na każdy fragment wystarczy 10 cyfr. */
     if (x->len > (SIZE_MAX - 1) / 10) {
         return BIG_UINT_NOMEM;
     }

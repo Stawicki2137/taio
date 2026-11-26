@@ -264,6 +264,18 @@ static bool write_result(FILE *output, const Dataset *dataset,
     const PartitionPart **parts = NULL;
     const PartitionPart **scratch = NULL;
     bool success = false;
+    for (size_t i = 0; i < dataset->count; ++i) {
+        if (big_uint_add_assign(&total, &dataset->items[i].value) != BIG_UINT_OK) {
+            goto memory_error;
+        }
+    }
+    if (!write_values(output, dataset, &total, NULL, dataset->count)) {
+        goto cleanup;
+    }
+    if (result == NULL) {
+        success = fputs("BRAK\n", output) != EOF;
+        goto cleanup;
+    }
     if (result->count > SIZE_MAX / sizeof(*parts)) {
         goto memory_error;
     }
@@ -276,14 +288,6 @@ static bool write_result(FILE *output, const Dataset *dataset,
         parts[i] = &result->parts[i];
     }
     sort_parts(parts, scratch, 0, result->count, dataset);
-    for (size_t i = 0; i < dataset->count; ++i) {
-        if (big_uint_add_assign(&total, &dataset->items[i].value) != BIG_UINT_OK) {
-            goto memory_error;
-        }
-    }
-    if (!write_values(output, dataset, &total, NULL, dataset->count)) {
-        goto cleanup;
-    }
     for (size_t i = 0; i < result->count; ++i) {
         const PartitionPart *part = parts[i];
         if (!write_values(output, dataset, &part->sum, part->indices, part->count)) {
@@ -302,7 +306,8 @@ cleanup:
     return success;
 }
 
-static bool process_dataset(FILE *output, char *line, size_t k, size_t dataset_index)
+static bool process_dataset(FILE *output, char *line, size_t k, size_t dataset_index,
+                            bool exact)
 {
     Dataset dataset = {NULL, 0, 0};
     PartitionResult result = PARTITION_RESULT_INIT;
@@ -315,9 +320,14 @@ static bool process_dataset(FILE *output, char *line, size_t k, size_t dataset_i
                     : "brak pamieci na dane wejsciowe.");
         goto cleanup;
     }
-    PartitionStatus status =
-        partition_descending(dataset.items, dataset.count, k, &result);
+    PartitionStatus status = exact
+        ? partition_exact(dataset.items, dataset.count, k, &result)
+        : partition_descending(dataset.items, dataset.count, k, &result);
     if (status == PARTITION_IMPOSSIBLE) {
+        if (exact) {
+            success = write_result(output, &dataset, NULL);
+            goto cleanup;
+        }
         fprintf(stderr, "Zbior %zu: liczba elementow jest mniejsza niz k.\n",
                 dataset_index);
         goto cleanup;
@@ -335,7 +345,7 @@ cleanup:
     return success;
 }
 
-static int process_input(FILE *input, FILE *output, size_t k)
+static int process_input(FILE *input, FILE *output, size_t k, bool exact)
 {
     char *line = NULL;
     size_t capacity = 0;
@@ -364,7 +374,7 @@ static int process_input(FILE *input, FILE *output, size_t k)
         if (i > 0 && fputc('\n', output) == EOF) {
             goto cleanup;
         }
-        if (!process_dataset(output, line, k, i + 1)) {
+        if (!process_dataset(output, line, k, i + 1, exact)) {
             goto cleanup;
         }
     }
@@ -457,21 +467,21 @@ static bool replace_output(const char *temporary_name, const char *output_name)
 
 int main(int argc, char **argv)
 {
-    if (argc != 3) {
-        fprintf(stderr, "Uzycie: %s plik_wejsciowy k\n", argv[0]);
+    if (argc != 4 || (strcmp(argv[1], "A") != 0 && strcmp(argv[1], "D") != 0)) {
+        fprintf(stderr, "Uzycie: %s A|D plik_wejsciowy k\n", argv[0]);
         return EXIT_FAILURE;
     }
     size_t k;
-    if (!parse_size(argv[2], &k) || k < 2) {
+    if (!parse_size(argv[3], &k) || k < 2) {
         fputs("k musi byc liczba calkowita >= 2 mieszczaca sie w size_t.\n", stderr);
         return EXIT_FAILURE;
     }
-    FILE *input = fopen(argv[1], "rb");
+    FILE *input = fopen(argv[2], "rb");
     if (input == NULL) {
-        perror(argv[1]);
+        perror(argv[2]);
         return EXIT_FAILURE;
     }
-    char *output_name = make_output_name(argv[1]);
+    char *output_name = make_output_name(argv[2]);
     if (output_name == NULL) {
         fputs("Brak pamieci na nazwe pliku wynikowego.\n", stderr);
         fclose(input);
@@ -484,7 +494,7 @@ int main(int argc, char **argv)
         fclose(input);
         return EXIT_FAILURE;
     }
-    int exit_code = process_input(input, output, k);
+    int exit_code = process_input(input, output, k, strcmp(argv[1], "D") == 0);
     if (fclose(input) != 0) {
         fputs("Blad zamykania pliku wejsciowego.\n", stderr);
         exit_code = EXIT_FAILURE;
