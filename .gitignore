@@ -3,3 +3,6 @@
 *.obj
 *.dll
 taio
+gen
+robocze/
+__pycache__/

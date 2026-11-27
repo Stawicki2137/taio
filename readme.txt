@@ -57,3 +57,33 @@ plik wynikowy dla danego pliku wejściowego.
 
 Błędy wejścia, odczytu lub zapisu są zgłaszane w terminalu. Po błędzie
 wcześniejszy poprawny plik wynikowy pozostaje zachowany.
+
+
+POMIARY CZASU (sekcja Testy sprawozdania)
+
+Generator danych testowych kompilujemy tak samo jak program:
+
+gcc -std=c17 -Wall -Wextra -O2 gen.c big_uint.c -o gen.exe
+
+.\gen.exe rodzina n k R bity porzadek ziarno plik_wyjsciowy
+
+Zapisuje R zbiorów po n liczb we wspólnym formacie wejściowym.
+Rodziny: pes (podział idealny nie istnieje, algorytm D przegląda wszystkie
+k^n kandydatów), los (liczby losowe z [1, 2^bity - 1], suma podzielna
+przez k), idealny (podział idealny istnieje z konstrukcji). Porządek:
+los, nier (nierosnąco), niem (niemalejąco). Te same argumenty dają zawsze
+identyczny plik, np.
+
+.\gen.exe los 20 2 10 20 los 2020 dane_los.txt
+
+Pomiary uruchamia skrypt bench.py (Python 3, tylko biblioteka
+standardowa) z katalogu, w którym leżą taio.exe i gen.exe:
+
+py bench.py                wszystkie serie T1..T5
+py bench.py --serie T1 T3  wybrane serie
+py bench.py --pilot        szybki przebieg kontrolny
+
+Wyniki trafiają do katalogu wyniki (jeden plik CSV na serię oraz
+srodowisko.txt), pliki robocze do katalogu robocze i są usuwane po
+każdym pomiarze. Wykresy w sprawozdaniu są rysowane bezpośrednio
+z plików CSV.

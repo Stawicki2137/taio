@@ -1,0 +1,874 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\IfFileExists{polski.sty}{\usepackage{polski}}{}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
+}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{indentfirst}
+\usepackage{booktabs}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+% Wiersze CSV, w ktorych kolumna #1 ma wartosc rozna od #2, sa pomijane.
+\pgfplotsset{
+    discard if not/.style 2 args={
+        x filter/.append code={
+            \edef\tempa{\thisrow{#1}}%
+            \edef\tempb{#2}%
+            \ifx\tempa\tempb\else\def\pgfmathresult{inf}\fi
+        }
+    },
+    every axis/.append style={grid=major, grid style={gray!25},
+        legend cell align=left, legend style={font=\scriptsize}},
+    % dwa wykresy obok siebie: drugi z opcjami at=..., xshift=2cm, anchor=south west
+    dwa/.style={scale only axis, width=0.36\textwidth, height=4.6cm},
+    prawy/.style={at={(lewy.south east)}, xshift=2cm, anchor=south west},
+}
+\renewcommand{\baselinestretch}{1.3}
+
+\makeatletter
+\renewcommand{\fnum@algorithm}{Algorytm}
+\makeatother
+
+\newtheorem{theorem}{Twierdzenie}
+\newtheorem{lemma}{Lemat}
+\newtheorem{fact}{Fakt}
+\newtheorem{corollary}{Wniosek}
+\renewcommand{\proofname}{Dowód}
+
+\algrenewcommand{\algorithmicrequire}{\textbf{Wejście:}}
+\algrenewcommand{\algorithmicensure}{\textbf{Wynik:}}
+
+\newcommand{\todo}[1]{{\color{red} \huge  \textbf{TODO: #1}}}
+
+\newcommand{\bazaind}{\noindent \textbf{Baza indukcji. }}
+\newcommand{\krokind}{\noindent \textbf{Krok indukcyjny. }}
+
+\title{Teoria Algorytmów i Obliczeń -- projekt}
+\author{Mateusz Kozłowski, Mateusz Siciarek, Mateusz Stawicki}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Wstęp}
+
+Dokument opisuje problem podziału zbioru na \(k\) podzbiorów oraz sposoby jego rozwiązania. Propozycje rozwiązań są przedstawione w dokumencie jako opisy algorytmów wraz z dowodem ich złożoności. 
+
+\section{Opis problemu, założenia i definicje}
+
+\subsection{Formalny opis problemu oraz założenia}
+
+Przyjmijmy, że wejściem problemu jest $n$-elementowy multizbiór $X = \{a_1, a_2, \dots, a_n\}$. Zakładamy, że wszystkie elementy są nieujemnymi liczbami całkowitymi, czyli:
+\begin{equation}
+    \forall_{i \in \{1, \dots, n\}} : a_i \in \mathbb{N}_0,
+    \label{eq:positive_elems}
+\end{equation}
+gdzie $\mathbb{N}_0$ oznacza zbiór liczb naturalnych wraz z zerem. Zwróćmy uwagę, że elementy multizbioru rozróżniamy poprzez ich indeksy - dwie jednakowe wartości liczbowe stanowią osobne elementy.
+
+Oznaczmy przez $[n] = \{1, \dots, n\}$ zbiór indeksów elementów multizbioru $X$. Całkowitą sumę wszystkich elementów oznaczamy jako:
+\begin{equation}
+    S_X = \sum_{i=1}^n a_i.
+\end{equation}
+
+Dla dowolnego podzbioru indeksów $I \subseteq [n]$, sumę odpowiadających mu elementów definiujemy jako:
+\begin{equation}
+    S_I = \sum_{i \in I} a_i.
+\end{equation}
+
+\subsubsection{Opis problemu - podział na $k$ niepustych podzbiorów}
+
+Rozważmy problem polegający na podziale multizbioru $X$ na $k \ge 2$ podzbiorów. Poszukujemy partycji zbioru indeksów $[n]$ na $k$ rozłącznych i niepustych podzbiorów $(A_1, A_2, \dots, A_k)$ spełniających warunki:
+\begin{equation}
+    \bigcup_{j=1}^k A_j = [n] \quad \text{oraz} \quad A_i \cap A_j = \emptyset \quad \text{dla wszystkich } i \neq j.
+\end{equation}
+
+Chcemy zminimalizować największą różnicę między sumami elementów w dowolnych dwóch podzbiorach partycji. Dla dwóch sum definiujemy ich różnicę bezwzględną jako:
+\begin{equation}
+    \Delta(S_I, S_J) = |S_I - S_J|.
+\end{equation}
+Funkcję celu definiujemy wtedy jako:
+\begin{equation}
+    \Delta(A_1, \dots, A_k) = \max_{1 \le i < j \le k} \Delta(S_{A_i}, S_{A_j}).
+\end{equation}
+
+Problem optymalizacyjny sprowadza się do znalezienia podziału $(A_1, \dots, A_k)$ minimalizującego wartość tak zdefiniowanej funkcji $\Delta$:
+\begin{equation}
+    \min_{(A_1, \dots, A_k)} \Delta(A_1, \dots, A_k).
+\end{equation}
+
+W tym przypadku \textbf{podział idealny} zachodzi wtedy i tylko wtedy, gdy suma elementów w każdym z $k$ podzbiorów jest identyczna i wynosi:
+\begin{equation}
+    S_{A_1} = S_{A_2} = \dots = S_{A_k} = \frac{1}{k} S_X,
+\end{equation}
+co odpowiada wartości funkcji celu $\Delta(A_1, \dots, A_k) = 0$. Warunkiem koniecznym (choć niewystarczającym) do istnienia podziału idealnego jest podzielność całkowitej sumy $S_X$ przez liczbę podzbiorów $k$, czyli $S_X \bmod k = 0$.
+
+\section{Algorytmy -- opisy i dowody}
+
+\subsection{Algorytm dokładny przeglądu zupełnego}
+
+\subsubsection{Specyfikacja problemu}
+
+Wejściem jest ciąg \(a_1,\ldots,a_n\) spełniający założenie \eqref{eq:positive_elems} oraz liczba części \(k\geq 2\).
+Poszczególne wystąpienia wartości rozróżniamy za pomocą ich indeksów.
+
+Algorytm ma ustalić, czy istnieje \textbf{podział idealny} zdefiniowany w sekcji problemowej, czyli partycja \(\mathcal{P}=(A_1,\ldots,A_k)\) zbioru indeksów \([n]\) na \(k\) niepustych, parami rozłącznych części, której sumy części spełniają \(S_{A_1}=S_{A_2}=\cdots=S_{A_k}=S_X/k\), co odpowiada wartości zero funkcji celu \(\Delta\). Jeżeli taki podział istnieje, algorytm zwraca jedną partycję go realizującą. W przeciwnym przypadku zwraca komunikat \texttt{BRAK}; w szczególności, jeśli \(n<k\), dopuszczalny podział nie istnieje.
+
+Podział idealny, o ile istnieje, nie musi być jednoznaczny -- różne rozkłady indeksów na części mogą dawać równe sumy, a ta sama partycja ma \(k!\) różniących się jedynie numeracją części reprezentacji. Algorytm zwraca \textbf{pierwsze napotkane} rozwiązanie w kolejności generowania kandydatów i natychmiast kończy działanie; pozostałych kandydatów nie bada już wcale. Odpowiedź \texttt{BRAK} oznacza, że żaden z wszystkich kandydatów nie reprezentuje podziału idealnego.
+
+\subsubsection{Idea algorytmu i generowanie kandydatów}
+
+Przypomnijmy, że \(S_X=\sum_{i=1}^{n}a_i\) oznacza sumę wszystkich elementów wejścia. Jeżeli \(n<k\), nie istnieje podział \([n]\) na \(k\) niepustych części. Jeżeli \(S_X\) nie jest podzielna przez \(k\), podział idealny również nie istnieje, ponieważ z równości sum wszystkich części wynika \(S_X=k\cdot S_{A_1}\).
+
+W pozostałych przypadkach wystarczy znaleźć podział \([n]\) na \(k\) niepustych części o sumach równych \(\mathrm{cel}=S_X/k\). Podział reprezentujemy wektorem \(b=(b_1,\ldots,b_n)\in[k]^n\), gdzie \(b_i=j\) oznacza \(i\in A_j\). Rodzina zbiorów
+\begin{equation}
+A_j=\{i\in[n]:\ b_i=j\}, \qquad j\in[k],
+\end{equation}
+jest wówczas zawsze podziałem zbioru \([n]\) na \(k\) rozłącznych części -- zmienną pozostaje jedynie niepustość tych części.
+
+Dla \(n\geq k\) definiujemy zbiór kandydatów:
+\begin{equation}
+\mathcal{V}_{n,k}=[k]^n.
+\end{equation}
+Kandydat \(b\) jest \textbf{dopuszczalny}, jeśli każda z części \(A_1,\ldots,A_k\) jest niepusta, czyli jeśli każda wartość z \([k]\) występuje w \(b\) co najmniej raz. Niepustość części testujemy za pomocą liczników wystąpień wartości w wektorze \(b\), a nie za pomocą sum części. Jest to istotne, ponieważ elementy wejścia mogą być zerami: dla wejścia złożonego z samych zer zachodzi \(S_X=0\) oraz \(\mathrm{cel}=0\), więc sam test sum nie odróżniłby pustej części od części złożonej z elementów zerowych.
+
+Liczba kandydatów wynosi:
+\begin{equation}
+m=|\mathcal{V}_{n,k}|=k^n.
+\end{equation}
+Instrukcja \texttt{for each b in [k]\^{}n} oznacza generowanie kolejno wszystkich wektorów z \([k]^n\), każdego dokładnie raz, bez przechowywania całego zbioru. Można to zrealizować przez zliczanie \(k\)-czne na \(n\) pozycjach: zaczynamy od wektora \((1,\ldots,1)\), a następnie zwiększamy licznik o jeden, kończąc po przetworzeniu układu \((k,\ldots,k)\). Pojedyncze zwiększenie wymaga najwyżej \(O(n)\) zmian pozycji, jednak łączna liczba zmian pozycji podczas całego zliczania wynosi
+\begin{equation}
+k^n+k^{n-1}+\cdots+k+1=\frac{k^{n+1}-1}{k-1}<2k^n,
+\end{equation}
+zatem koszt zamortyzowany generowania jednego kandydata wynosi \(O(1)\).
+
+Kolejność generowania jest deterministyczna, więc pojęcie \textbf{pierwszego napotkanego} rozwiązania jest dobrze określone: dla ustalonego wejścia algorytm zwraca zawsze ten sam wynik, nawet jeśli rozwiązań istnieje wiele. Zauważmy wreszcie, że jedna partycja \((A_1,\ldots,A_k)\) ma \(k!\) reprezentacji wektorowych w \([k]^n\) (wynikających z permutacji numerów części). Redundancja ta nie wpływa na poprawność -- wszystkie reprezentacje tej samej partycji dają identyczne rodziny sum -- ani na rząd złożoności, ponieważ algorytm przegląda wszystkie \(k^n\) wektorów z \(\mathcal{V}_{n,k}\) niezależnie od tego, ile z nich reprezentuje ten sam podział.
+
+\subsubsection{Pseudokod}
+
+\begin{verbatim}
+BRUTE-K-PODZIAL(a[1..n], k):
+    if n < k:
+        return BRAK
+
+    S_X := 0
+    for i := 1 to n:
+        S_X := S_X + a[i]
+
+    if S_X mod k != 0:
+        return BRAK
+
+    cel := S_X / k
+
+    for each b in [k]^n:
+        for j := 1 to k:
+            S[j] := 0
+            licz[j] := 0
+
+        for i := 1 to n:
+            S[b[i]] := S[b[i]] + a[i]
+            licz[b[i]] := licz[b[i]] + 1
+
+        dopuszczalny := true
+        for j := 1 to k:
+            if licz[j] = 0:
+                dopuszczalny := false
+
+        if dopuszczalny:
+            idealny := true
+            for j := 1 to k:
+                if S[j] != cel:
+                    idealny := false
+
+            if idealny:
+                // pierwsze trafienie: wynik zwracamy natychmiast,
+                // pozostalych kandydatow nie badamy
+                for j := 1 to k:
+                    A[j] := {i in [n] : b[i] = j}
+                return (A[1], ..., A[k])
+
+    return BRAK
+\end{verbatim}
+
+Dzielenie \(S_X/k\) daje tutaj wynik całkowity, ponieważ wartości \(S_X\) niedzielne przez \(k\) zostały wcześniej wykluczone.
+
+\subsubsection{Dowód częściowej poprawności}
+
+Pokażemy, że każdy wynik zwrócony przez algorytm jest zgodny ze specyfikacją. Niezmienniki pętli udowodnimy indukcyjnie względem liczby wykonanych iteracji.
+
+\paragraph{Poprawność początkowego odrzucenia.}
+
+Jeżeli \(n<k\), nie można podzielić \(n\)-elementowego zbioru \([n]\) na \(k\) niepustych części. Ponadto istnienie podziału idealnego pociąga za sobą:
+\begin{equation}
+S_X=\sum_{j=1}^{k}S_{A_j}=k\cdot S_{A_1}.
+\end{equation}
+Wobec całkowitości \(S_{A_1}\) liczba \(S_X\) musi być podzielna przez \(k\). Oba początkowe warunki odrzucenia są zatem poprawne.
+
+\paragraph{Niezmiennik pętli obliczającej sumę \(S_X\).}
+
+Niech \(\Sigma_j\) oznacza wartość zmiennej \texttt{S\_X} po \(j\) iteracjach pierwszej pętli. Wykażemy indukcyjnie, że:
+\begin{equation}
+\Sigma_j=\sum_{i=1}^{j}a_i, \qquad 0\leq j\leq n.
+\end{equation}
+\bazaind Dla \(j=0\) zmienna \texttt{S\_X} ma wartość \(0\), równą sumie pustej.
+
+\krokind Załóżmy, że równość zachodzi dla pewnego \(j<n\). W następnej iteracji do zmiennej dodawane jest \(a_{j+1}\), więc:
+\begin{equation}
+\Sigma_{j+1}=\Sigma_j+a_{j+1}=\sum_{i=1}^{j+1}a_i.
+\end{equation}
+Na mocy indukcji po zakończeniu pętli \(\Sigma_n\) jest sumą wszystkich elementów wejścia, czyli \(\Sigma_n=S_X\).
+
+\paragraph{Niezmiennik pętli wewnętrznej.}
+
+Ustalmy kandydata \(b\in[k]^n\). Niech \(S_j^{(t)}\) oraz \(\mathrm{licz}_j^{(t)}\) oznaczają wartości zmiennych \texttt{S[j]} i \texttt{licz[j]} po przetworzeniu pierwszych \(t\) pozycji. Wykażemy indukcyjnie, że dla każdego \(j\in[k]\) jednocześnie:
+\begin{equation}
+S_j^{(t)}=\sum_{\substack{1\leq i\leq t\\b_i=j}}a_i, \qquad \mathrm{licz}_j^{(t)}=\bigl|\{i\leq t:\ b_i=j\}\bigr|, \qquad 0\leq t\leq n.
+\end{equation}
+\bazaind Dla \(t=0\) wszystkie sumy i liczniki mają wartość \(0\), równą sumie pustej i mocy zbioru pustego.
+
+\krokind Załóżmy, że niezmiennik zachodzi dla pewnego \(t<n\). Oznaczmy \(j^{*}=b_{t+1}\). W następnej iteracji do \texttt{S[j*]} dodawane jest \(a_{t+1}\), a \texttt{licz[j*]} zwiększane o jeden, natomiast zmienne o indeksach innych niż \(j^{*}\) pozostają bez zmian. Indeks \(t+1\) należy właśnie do zbioru \(\{i\leq t+1:\ b_i=j^{*}\}\) i do żadnego innego zbioru tej postaci, więc:
+\begin{equation}
+S_{j^{*}}^{(t+1)}=S_{j^{*}}^{(t)}+a_{t+1}=\sum_{\substack{1\leq i\leq t+1\\b_i=j^{*}}}a_i, \qquad \mathrm{licz}_{j^{*}}^{(t+1)}=\bigl|\{i\leq t+1:\ b_i=j^{*}\}\bigr|,
+\end{equation}
+a dla \(j\neq j^{*}\) obie równości przenoszą się z założenia indukcyjnego. Na mocy indukcji po zakończeniu pętli, dla każdego \(j\in[k]\):
+\begin{equation}
+\texttt{S[j]}=S_j^{(n)}=\sum_{i\in A_j}a_i=S_{A_j}, \qquad \texttt{licz[j]}=\mathrm{licz}_j^{(n)}=|A_j|,
+\end{equation}
+gdzie \(A_j=\{i\in[n]:\ b_i=j\}\).
+
+\paragraph{Poprawność testu dopuszczalności.}
+
+Z udowodnionego niezmiennika test \texttt{licz[j] = 0} odrzuca kandydata wtedy i tylko wtedy, gdy któraś z części \(A_1,\ldots,A_k\) jest pusta. Kandydat przechodzi test dokładnie wtedy, gdy jest surjekcją z \([n]\) na \([k]\).
+
+Zwróćmy uwagę, dlaczego liczniki są konieczne. Dla wejścia złożonego z samych zer mamy \(S_X=0\) oraz \(\mathrm{cel}=0\). Wektor \(b=(1,\ldots,1)\) spełnia wówczas warunek \(\texttt{S[j]}=\mathrm{cel}\) dla części \(A_1=[n],\ A_2=\cdots=A_k=\emptyset\), choć nie jest dopuszczalny. Sam test sum nie odróżniłby więc pustej części od części złożonej z elementów zerowych i mógłby zwrócić podział naruszający warunek niepustości.
+
+\paragraph{Poprawność zwróconego podziału.}
+
+Załóżmy, że algorytm zwraca ciąg \((A_1,\ldots,A_k)\). Z konstrukcji \(A_j=\{i\in[n]:\ b_i=j\}\) każda pozycja trafia do dokładnie jednej części, zatem:
+\begin{equation}
+\bigcup_{j=1}^{k}A_j=[n], \qquad A_i\cap A_j=\emptyset\quad(i\neq j).
+\end{equation}
+Ponieważ kandydat przeszedł test dopuszczalności, wszystkie części są niepuste. Z niezmiennika pętli wewnętrznej oraz testu \texttt{S[j] = cel} otrzymujemy ponadto:
+\begin{equation}
+S_{A_j}=\frac{S_X}{k} \qquad\text{dla każdego }j\in[k].
+\end{equation}
+Zwrócony wynik jest więc dopuszczalnym podziałem idealnym.
+
+\paragraph{Własność zwróconego pierwszego rozwiązania.}
+
+Zwrócony podział jest dopuszczalny i idealny niezależnie od tego, ile rozwiązań istnieje. Jeżeli rozwiązań jest wiele, algorytm zwraca to z nich, którego reprezentacja wektorowa pojawia się najwcześniej w kolejności zliczania \(k\)-cznego. Reprezentacje różniące się jedynie permutacją numerów części tej samej partycji dają partycje o identycznych rodzinach sum, więc wybór konkretnej reprezentacji nie wpływa na zgodność wyniku ze specyfikacją. Wcześniejszy zwrot pomija jedynie kandydatów, którzy -- na mocy niezmiennika pętli zewnętrznej -- i tak nie są rozwiązaniami.
+
+\paragraph{Niezmiennik pętli zewnętrznej.}
+
+Niech \(b^{(1)},\ldots,b^{(m)}\), \(m=k^n\), oznaczają wektory z \([k]^n\) w kolejności ich generowania. Wykażemy indukcyjnie względem \(t\), że po przetworzeniu pierwszych \(t\) kandydatów, jeżeli algorytm nie zwrócił wyniku i kontynuuje działanie, zachodzi:
+\begin{equation}
+\forall r\in\{1,\ldots,t\}\qquad b^{(r)}\ \text{nie jest dopuszczalnym wektorem podziału idealnego},
+\end{equation}
+czyli \(b^{(r)}\) nie spełnia łącznie warunku suriektywności oraz równości wszystkich sum części i wartości \(\mathrm{cel}\).
+
+\noindent \textbf{Baza indukcji.} Dla \(t=0\) nie sprawdzono jeszcze żadnego kandydata. Warunek zachodzi, ponieważ kwantyfikacja dotyczy zbioru pustego.
+
+\noindent \textbf{Krok indukcyjny.} Załóżmy, że niezmiennik zachodzi po \(t<m\) iteracjach i algorytm kontynuuje działanie. W następnej iteracji przetwarzany jest wektor \(b^{(t+1)}\). Na podstawie udowodnionych niezmienników algorytm poprawnie wyznacza sumy i liczniki wszystkich części, a więc poprawnie rozstrzyga dopuszczalność i idealność kandydata.
+
+Jeżeli \(b^{(t+1)}\) jest dopuszczalnym wektorem podziału idealnego, algorytm zwraca poprawny podział i kończy działanie -- niezmiennik nie musi już obowiązywać. Jeżeli nie jest, algorytm kontynuuje działanie i własność ta zachodzi dla \(b^{(t+1)}\). Łącząc ją z założeniem indukcyjnym, otrzymujemy niezmiennik dla \(t+1\).
+
+Z niezmiennika wynika w szczególności, że jeżeli algorytm zwraca wynik przy kandydacie \(b^{(t+1)}\), to \(t+1\) jest \textbf{najmniejszym} indeksem o tej własności -- zwrócony wektor jest istotnie pierwszym trafieniem w kolejności generowania.
+
+\paragraph{Poprawność końcowego wyniku \texttt{BRAK}.}
+
+Jeżeli algorytm dociera do ostatniej instrukcji \texttt{return BRAK}, przetworzył wszystkie \(m=k^n\) wektorów. Z niezmiennika pętli zewnętrznej wynika, że żaden z nich nie jest dopuszczalnym wektorem podziału idealnego.
+
+Załóżmy przeciwnie, że istnieje dopuszczalny podział idealny \((A_1^{*},\ldots,A_k^{*})\). Rozważmy wektor \(b^{*}\) dany przez \(b^{*}_i=j\iff i\in A_j^{*}\). Ponieważ wszystkie części są niepuste, \(b^{*}\) jest surjekcją na \([k]\), a zatem \(b^{*}\in[k]^n\) i \(b^{*}=b^{(r)}\) dla pewnego \(r\in\{1,\ldots,m\}\). Dla tego kandydata wszystkie liczniki są dodatnie, a wszystkie sumy części równe \(S_X/k=\mathrm{cel}\), więc algorytm zwróciłby wynik najpóźniej w \(r\)-tej iteracji, co przeczy dojściu do instrukcji \texttt{return BRAK}.
+
+Końcowy wynik \texttt{BRAK} jest więc poprawny. Łącznie z poprzednimi przypadkami dowodzi to częściowej poprawności algorytmu.
+
+\subsubsection{Dowód własności stopu}
+
+Dla \(n<k\) algorytm zatrzymuje się natychmiast. Dla \(n\geq k\) pierwsza pętla ma dokładnie \(n\) iteracji. Jeśli \(S_X\) nie dzieli się przez \(k\), algorytm następnie się zatrzymuje.
+
+W pozostałym przypadku generator produkuje dokładnie \(m=k^n\) kandydatów, każdego w skończonym czasie -- każde zwiększenie licznika \(k\)-cznego wymaga najwyżej \(n\) zmian pozycji. Po przetworzeniu \(t\) kandydatów liczba pozostałych wynosi \(m-t\); przy kontynuowaniu pętli maleje ona o jeden i jest nieujemna. Dla każdego kandydata pętla wyznaczająca sumy i liczniki wykonuje dokładnie \(n\) iteracji, natomiast inicjalizacja tablic oraz testy wykonują łącznie co najwyżej \(3k\) iteracji pętli po \(k\) kroków. Wcześniejszy zwrot wyniku może jedynie skrócić działanie algorytmu i nie wpływa na ten rachunek.
+
+Wszystkie pętle są zatem skończone. Utworzenie zbiorów wynikowych wymaga przejrzenia \(n\) pozycji, więc także kończy się w skończonym czasie. Algorytm zatrzymuje się dla każdego wejścia. W połączeniu z częściową poprawnością otrzymujemy całkowitą poprawność.
+
+\subsubsection{Złożoność czasowa}
+
+\paragraph{Model jednostkowego kosztu.}
+
+Najpierw prowadzimy analizę w modelu jednostkowego kosztu operacji arytmetycznych, porównań i dostępu do elementów tablicy, zakładając, że wartości wejściowe, ich sumy oraz \(k\) mieszczą się w słowie pamięci.
+
+Obliczenie \(S_X\) wymaga \(\Theta(n)\) czasu. Kandydatów jest \(m=k^n\), a koszt zamortyzowany wygenerowania jednego z nich wynosi \(O(1)\). Sprawdzenie jednego kandydata wymaga \(\Theta(n)\) czasu na wyznaczenie sum i liczników oraz \(\Theta(k)\) czasu na inicjalizację tablic \texttt{S} i \texttt{licz} oraz na test dopuszczalności, który przegląda wszystkie pozycje liczników zawsze w całości, niezależnie od ich wartości; test idealności wykonywany jedynie dla kandydatów dopuszczalnych mieści się w tej samej granicy. Utworzenie zbiorów wynikowych wymaga \(O(n)\) czasu i następuje najwyżej raz. Stąd:
+\begin{equation}
+T_{\mathrm{pes}}(n,k)=O\bigl(n+(n+k)\,k^n\bigr).
+\end{equation}
+Aby wykazać dolne oszacowanie, dla dowolnych \(n\geq k\geq2\) rozważmy wejście:
+\begin{equation}
+a_1=\cdots=a_{n-1}=k, \qquad a_n=k(n+1).
+\end{equation}
+Wtedy:
+\begin{equation}
+S_X=k(n-1)+k(n+1)=2kn, \qquad \frac{S_X}{k}=2n,
+\end{equation}
+zatem \(S_X\) jest podzielna przez \(k\) i test wstępny nie odrzuca tego wejścia. Jednak część zawierająca indeks \(n\) ma wartość co najmniej \(k(n+1)>2n\), więc jej suma różni się od \(\mathrm{cel}=2n\) i podział idealny nie istnieje. Wczesne zwrócenie wyniku jest niemożliwe, a algorytm sprawdza wszystkich \(m=k^n\) kandydatów, wydając na każdym kandydacie \(\Theta(n+k)\) czasu. Otrzymujemy:
+\begin{equation}
+T_{\mathrm{pes}}(n,k)=\Omega\bigl((n+k)\,k^n\bigr).
+\end{equation}
+Łącząc oszacowania oraz korzystając z \(k\leq n\), mamy ostatecznie:
+\begin{equation}
+\boxed{T_{\mathrm{pes}}(n,k)=\Theta\bigl((n+k)\,k^n\bigr)=\Theta\bigl(n\,k^n\bigr)\quad\text{dla }2\leq k\leq n.}
+\end{equation}
+Zwróćmy uwagę, że oszacowanie dotyczy najgorszego przypadku: wejść bez rozwiązania albo takich, których rozwiązanie pojawia się późno w kolejności generowania. Wejścia z rozwiązaniem wcześniejszym w tej kolejności mogą kończyć się szybciej, algorytm nie ma jednak gwarancji znalezienia rozwiązania przed pełnym przeglądem.
+
+\paragraph{Kryterium logarytmiczne.}
+
+W modelu jednostkowym założyliśmy, że dodawanie i porównywanie liczb ma koszt stały. W kryterium logarytmicznym operacje te \textbf{nie są atomowe}: ich koszt rośnie liniowo wraz z długością binarnego zapisu operandów. Przyjmijmy, zgodnie z konwencją przyjętą dla algorytmu aproksymacyjnego, że
+\begin{equation}
+b_i=\max\bigl(1,\lceil\log_2(a_i+1)\rceil\bigr), \qquad b=\max_{1\leq i\leq n}b_i, \qquad s=b+\lceil\log_2 n\rceil,
+\end{equation}
+gdzie \(b_i\) jest liczbą bitów zapisu \(a_i\), a \(s\) górnym ograniczeniem długości zapisu sum części, wartości \(S_X\) oraz \(\mathrm{cel}\); istotnie, \(S_j\leq S_X<n2^b\). Indeksy, liczniki wystąpień (\(\mathrm{licz}[j]\leq n\)) oraz \(k\) traktujemy jako mieszczące się w słowie maszynowym o koszcie \(O(1)\).
+
+Pojedyncze dodanie \(a_{i}\) do sumy \texttt{S[j]}, porównanie \texttt{S[j]} z \(\mathrm{cel}\), test \(S_X\bmod k\) oraz obliczenie \(\mathrm{cel}=S_X/k\) operują na liczbach długości \(\Theta(s)\) bitów. Analogicznie jak w analizie algorytmu aproksymacyjnego, przyjmujemy najgorszy przypadek pojedynczej operacji danego typu: każda z tych operacji kosztuje wtedy dokładnie \(\Theta(s)\) operacji bitowych, niezależnie od konkretnej pary operandów. Zatem obliczenie \(S_X\) wymaga \(\Theta(ns)\) czasu, a sprawdzenie jednego kandydata wymaga \(n\) dodawań oraz \(O(k)\) porównań, co daje \(\Theta((n+k)\,s)\). Dla rodziny trudnej z poprzedniego akapitu algorytm wykonuje pełny przegląd wszystkich \(k^n\) kandydatów, stąd dolne i górne oszacowanie zbiegają się:
+\begin{equation}
+\boxed{T_{\mathrm{bit}}(n,k,b)=\Theta\bigl((n+k)\,k^n\,\bigl(b+\lceil\log_2 n\rceil\bigr)\bigr).}
+\end{equation}
+
+Zwróćmy uwagę na relację tego wyniku do rozmiaru wejścia. Rozmiar wejścia wynosi \(N=O(B)\) bitów, gdzie \(B=\sum_i b_i\), oraz \(B\geq n\). Dla rodzin wejść o wartościach ze zbioru \(\{0,1\}\) zachodzi \(b_i=1\) dla każdego \(i\), zatem \(B=\Theta(n)\) oraz \(N=\Theta(n)\). Ponieważ \(k\geq2\), czas działania algorytmu na takich wejściach spełnia
+\begin{equation}
+n\,k^n\geq n\,2^n=2^{\Omega(N)},
+\end{equation}
+zatem czas działania jest \textbf{eksponencjalny względem rozmiaru wejścia} w kryterium logarytmicznym -- już dla pesymistycznych wejść o jednubitowych wartościach. Model jednostkowy ukrywa czynnik \(s\), który w modelu logarytmicznym uwidacznia nieatomowość operacji na wielkich liczbach.
+\subsection{Autorski algorytm aproksymacyjny}
+
+\subsubsection{Specyfikacja problemu i rozmiar danych wejściowych}
+
+Dane są liczby $a_1,\ldots,a_n$ spełniające założenie \eqref{eq:positive_elems} oraz liczba części $k\geq 2$. Wystąpienia jednakowych wartości rozróżniamy za pomocą ich oryginalnych indeksów. 
+
+Szukamy partycji $\mathcal{P}=(A_1,\ldots,A_k)$ zbioru indeksów $[n]$ na $k$ niepustych, parami rozłącznych części, określonej w sekcji problemowej. Dla $S_j=\sum_{i\in A_j}a_i$ minimalizujemy rozpiętość sum
+\begin{equation}
+  \Delta(\mathcal{P})=\max_{1\leq j\leq k}S_j-\min_{1\leq j\leq k}S_j.
+\end{equation}
+Wielkość ta równa się $\max_{i\neq j}|S_i-S_j|$, czyli największej różnicy sum dwóch części, zgodnie ze sformułowaniem funkcji celu z sekcji problemowej. Jeśli $n<k$, dopuszczalny podział nie istnieje i algorytm zwraca komunikat \texttt{BRAK}; dla $n\geq k$ ma on zwrócić dowolny dopuszczalny podział. Przez $\Delta^*$ oznaczamy najmniejszą rozpiętość dopuszczalnego podziału dla $n\geq k$.
+
+Rozmiar wejścia zależy zarówno od liczby elementów $n$, jak i od długości zapisu samych liczb. Niech
+\begin{equation}
+  b_i=\max\bigl(1,\lceil\log_2(a_i+1)\rceil\bigr),\qquad
+  B=\sum_{i=1}^{n}b_i,\qquad
+  b=\max_{1\leq i\leq n}b_i.
+\end{equation}
+Wielkość $b_i$ oznacza liczbę bitów potrzebnych do zapisania $a_i$, $B$ jest łączną długością zapisów wszystkich wartości wejściowych, a $b$ jest długością najdłuższej z nich. Każda liczba zajmuje przynajmniej jeden bit, zatem $B\geq n$. Przypadek $k>n$ kończy się trywialnie odpowiedzią \texttt{BRAK}, zatem dalej zakładamy $2\leq k\leq n$; narzut separatorów oraz zapisu parametrów $n,k$ mieści się wtedy w $O(B)$ bitów. Przyjmujemy więc, że rozmiar całego wejścia wynosi
+\begin{equation}
+  N=O(B)\text{ bitów}.
+\end{equation}
+
+Zakładamy, że parametry $n,k$ oraz indeksy i liczniki mieszczą się w słowie maszynowym, a operacje na nich mają koszt $O(1)$. Wartości $a_i$ oraz sumy $S_j$ przechowujemy jako liczby całkowite o dowolnej precyzji. Ponieważ
+\begin{equation}
+  S_j\leq\sum_{i=1}^{n}a_i<n2^b,
+\end{equation}
+długość zapisu dowolnej sumy nie przekracza
+\begin{equation}
+  s=b+\lceil\log_2 n\rceil
+\end{equation}
+bitów. Przyjmujemy konwencję najgorszego przypadku pojedynczej operacji danego typu: porównanie dwóch wartości wejściowych kosztuje co najwyżej $O(b)$ operacji bitowych, natomiast dodawanie lub porównywanie sum co najwyżej $O(s)$ operacji bitowych. Koszt tych działań zależy więc liniowo od długości zapisu liczb w bitach, a tym samym logarytmicznie od ich wartości.
+
+
+\subsubsection{Idea algorytmu}
+
+Sortujemy pary $(a_i,i)$ malejąco według wartości, a przy równych
+wartościach rosnąco według oryginalnego indeksu. Pierwsze $k$ par
+umieszczamy po jednej w częściach $A_1,\ldots,A_k$. Dzięki temu każda
+część jest niepusta już po inicjalizacji.
+
+Pozostałe pary przetwarzamy w kolejnych blokach po $k$ elementów,
+ostatni blok może być krótszy. W obrębie każdego bloku przechodzimy
+od największej wartości do najmniejszej. Dla każdej pary wybieramy część
+o najmniejszej aktualnej sumie, dopisujemy do niej oryginalny indeks
+i aktualizujemy sumę. Wybór oraz aktualizację minimum obsługuje kopiec
+minimum przechowujący pary $(S_j,j)$. Przy równych sumach wybieramy
+najmniejszy numer części. Ta sama część może otrzymać kilka elementów
+jednego bloku, a inna żadnego.
+
+\subsubsection{Pseudokod}
+
+Po posortowaniu $v_p$ oznacza wartość, a $\operatorname{idx}_p$ oryginalny
+indeks elementu na pozycji $p$; pary spełniają
+$v_1\geq v_2\geq\cdots\geq v_n$ i
+$v_p=a_{\operatorname{idx}_p}$. Tablica $\operatorname{idx}$ jest
+permutacją $[n]$.
+
+\begin{verbatim}
+MALEJACY-PRZYDZIAL(a[1..n], k):
+    if n < k:
+        return BRAK 
+
+    (v, idx) := sortuj pary (a[i], i) malejąco według wartości, 
+                a przy remisie rosnąco według indeksu
+
+    // Przydział po jednym elemencie zapewnia niepustość każdej części
+    for j := 1 to k: 
+        A[j] := lista zawierajaca idx[j] 
+        S[j] := v[j]
+
+    H := BUILD-MIN-HEAP({(S[j], j) : j = 1,...,k})
+    p := k + 1 // Pozycja pierwszego elementu, który nie został jeszcze przypisany
+
+    while p <= n: 
+        // Koniec bloku liczącego najwyżej k elementów - ostatni blok może być krótszy
+        koniec := min(n, p + k - 1) 
+       
+        for q := p to koniec: // przetwarzanie bloku
+            (suma, j) := EXTRACT-MIN(H)
+            dopisz idx[q] do A[j]
+            S[j] := suma + v[q]
+            INSERT(H, (S[j], j))
+
+        p := koniec + 1
+
+    return (A[1], ..., A[k])
+\end{verbatim}
+
+\subsubsection{Dowód poprawności i własność stopu}
+
+Jeśli $n<k$, podział $n$ indeksów na $k$ niepustych części nie istnieje,
+więc odpowiedź \texttt{BRAK} jest poprawna. Dalej zakładamy $n\geq k$.
+Po inicjalizacji każda część zawiera dokładnie jeden inny indeks, sumy
+odpowiadają wartościom przypisanych elementów, a kopiec zawiera dokładnie
+jedną parę $(S_j,j)$ dla każdej części.
+
+Przed każdym następnym przydziałem przyjmujemy następujący niezmiennik:
+indeksy z pozycji $1,\ldots,q-1$ posortowanej tablicy zostały przypisane
+dokładnie raz, indeksy z pozycji $q,\ldots,n$ jeszcze nie zostały
+przypisane, każda część jest niepusta, zapisane sumy są poprawne,
+a kopiec zawiera po jednej aktualnej parze $(S_j,j)$ dla każdej części.
+Niezmiennik zachodzi przed pierwszym przydziałem, gdy $q=k+1$.
+
+Operacja \texttt{EXTRACT-MIN} usuwa parę części o najmniejszej sumie.
+Dopisanie $\operatorname{idx}_q$ przypisuje dokładnie jeden nowy indeks,
+a $S_j:=S_j+v_q$ daje sumę elementów w tej części. Operacja
+\texttt{INSERT} przywraca jej jedyną aktualną parę w kopcu. Pozostałe
+części pozostają bez zmian, zatem niezmiennik zachodzi przed kolejnym
+przydziałem. Granice bloków jedynie dzielą tę samą kolejność pozycji
+$k+1,\ldots,n$; żadna pozycja nie jest pomijana ani przetwarzana
+dwukrotnie. Po przetworzeniu ostatniej pozycji wszystkie indeksy należą
+do dokładnie jednej części, części są niepuste, a ich sumy są poprawne.
+Otrzymany podział jest więc dopuszczalny.
+
+Każdy obieg pętli zewnętrznej zwiększa $p$ o co najmniej $1$,
+a każda pętla wewnętrzna ma co najwyżej $k$ przebiegów. Sortowanie
+i operacje na skończonym kopcu również kończą się, więc algorytm się
+zatrzymuje.
+
+\subsubsection{Gwarancja jakości}
+Niech $a_{\max}=\max_i a_i$. Dla otrzymanego podziału zachodzi
+\begin{equation}
+  \boxed{\Delta_{\mathrm{alg}}\leq a_{\max}.}
+\end{equation}
+
+Po początkowym przydziale każda część zawiera jeden element wejściowy.
+Ponieważ wszystkie wartości należą do przedziału $[0,a_{\max}]$,
+początkowa rozpiętość nie przekracza $a_{\max}$.
+
+Rozważmy następny przydział. Niech $m$ i $M$ oznaczają odpowiednio
+najmniejszą i największą sumę przed przydziałem, a $m'$ i $M'$
+odpowiednie wartości po przydziale. Dotychczasowa rozpiętość wynosi
+$\Delta=M-m$.
+
+Dodajemy element o wartości $x\geq0$ do części o najmniejszej sumie $m$.
+Żadna suma nie maleje, zatem
+\begin{equation}
+  m'\geq m.
+\end{equation}
+Sumy niezmienionych części nie przekraczają $M$, natomiast suma
+zmienionej części wynosi $m+x$. Dlatego
+\begin{equation}
+  M'\leq\max(M,m+x).
+\end{equation}
+
+Korzystając z tych dwóch nierówności, otrzymujemy
+\begin{equation}
+  \begin{aligned}
+    \Delta'=M'-m'
+    &\leq M'-m\\
+    &\leq \max(M,m+x)-m\\
+    &=\max(M-m,m+x-m)\\
+    &=\max(M-m,x)\\
+    &=\max(\Delta,x).
+  \end{aligned}
+\end{equation}
+Pierwsza nierówność wynika z zastąpienia odejmowanej wartości $m'$
+wartością $m\leq m'$, co może zwiększyć różnicę.
+W drugiej nierówności zastępujemy $M'$ jego górnym ograniczeniem
+$\max(M,m+x)$.
+Następnie odejmujemy $m$ od obu argumentów maksimum.
+
+Jeżeli przed przydziałem zachodzi $\Delta\leq a_{\max}$,
+to wobec $x\leq a_{\max}$ otrzymujemy
+\begin{equation}
+  \Delta'\leq\max(\Delta,x)\leq a_{\max}.
+\end{equation}
+Ponieważ nierówność zachodzi po początkowym przydziale,
+indukcja po kolejnych przydziałach daje
+$\Delta_{\mathrm{alg}}\leq a_{\max}$.
+
+Wynik algorytmu jest dopuszczalnym podziałem, więc
+$\Delta^*\leq\Delta_{\mathrm{alg}}$.
+Ponadto $\Delta^*\geq0$, zatem otrzymujemy addytywną gwarancję
+\begin{equation}
+  0\leq\Delta_{\mathrm{alg}}-\Delta^*
+  \leq\Delta_{\mathrm{alg}}
+  \leq a_{\max}.
+\end{equation}
+
+Nie istnieje natomiast stały multiplikatywny współczynnik aproksymacji
+rozpiętości. Dla $t\geq1$ weźmy $k=3$ i liczby posortowane malejąco:
+\begin{equation}
+  6t+1,\ 3t,\ 3t,\ 2t,\ 2t,\ 2t.
+\end{equation}
+Początkowe sumy wynoszą $(6t+1,3t,3t)$. Trzy kolejne przydziały
+dają odpowiednio $(6t+1,5t,3t)$, $(6t+1,5t,5t)$ i
+$(6t+1,7t,5t)$, zatem $\Delta_{\mathrm{alg}}=2t$.
+Tymczasem podział
+\begin{equation}
+  \{6t+1\},\qquad \{3t,3t\},\qquad \{2t,2t,2t\}
+\end{equation}
+ma sumy $(6t+1,6t,6t)$, czyli rozpiętość $1$.
+Ponieważ suma wejścia $18t+1$ nie jest podzielna przez $3$,
+rozpiętość $0$ jest niemożliwa i $\Delta^*=1$.
+Stosunek $\Delta_{\mathrm{alg}}/\Delta^*=2t$ rośnie bez ograniczeń.
+
+\subsubsection{Złożoność czasowa}
+
+Analizujemy koszt bitowy, przyjmując najgorszy koszt $O(b)$
+porównania dwóch wartości wejściowych i $O(s)$ porównania lub dodania
+sum. Sortowanie przez scalanie par z zachowaniem ich oryginalnych
+indeksów zajmuje $O(n\log n\,b)$ czasu; przy remisie dodatkowe
+porównanie indeksów ma stały koszt w przyjętym modelu.
+Inicjalizacja części kosztuje $O(kb)$, a budowa kopca $O(ks)$.
+
+Po inicjalizacji pozostaje $n-k$ elementów. Każdy z nich wymaga
+jednego dodawania na liczbach do $s$ bitów oraz operacji
+\texttt{EXTRACT-MIN} i \texttt{INSERT}. Każda operacja kopca wykonuje
+$O(\log k)$ porównań sum, co kosztuje $O(s\log k)$ czasu bitowego.
+Wyznaczenie granic wszystkich bloków wymaga łącznie $O(n)$
+operacji na indeksach. Otrzymujemy
+\begin{equation}
+  T(n,k,b)=O\bigl(n\log n\,b+ks+(n-k)s(1+\log k)\bigr),
+  \qquad s=b+\lceil\log_2 n\rceil.
+\end{equation}
+Dla $2\leq k\leq n$ jest to w szczególności
+\begin{equation}
+  \boxed{T(n,k,b)=O\bigl(n\log n\,(b+\log n)\bigr).}
+\end{equation}
+
+\section{Kompilacja i uruchamianie programu}
+
+Program kompilujemy poleceniem:
+\begin{verbatim}
+gcc -std=c17 main.c big_uint.c number_sort.c min_heap.c partition.c partition_exact.c -o taio
+\end{verbatim}
+
+Uruchomienie wymaga podania trybu algorytmu, pliku wejściowego
+i liczby podzbiorów \(k\):
+\begin{verbatim}
+./taio A dane.txt 3
+./taio D dane.txt 3
+\end{verbatim}
+
+Tryb \texttt{A} uruchamia algorytm aproksymacyjny,
+a \texttt{D} algorytm dokładny. Wynik zostaje zapisany
+w pliku \texttt{dane\_output.txt}.
+
+\section{Testy obliczeniowe}
+
+\subsection{Sposób przeprowadzenia i powtórzenia pomiarów}
+
+Mierzymy czas działania oddawanego programu \texttt{taio} uruchamianego z~linii poleceń.
+Dane tworzy generator \texttt{gen} (plik \texttt{gen.c}, czyste C17), który dla tych samych
+argumentów zapisuje zawsze identyczny plik we wspólnym formacie wejściowym (własny generator
+liczb pseudolosowych \emph{splitmix64} z~podanym ziarnem). Pomiary przeprowadza skrypt
+\texttt{bench.py} (Python~3, wyłącznie biblioteka standardowa). Każdy punkt pomiarowy
+\((n,k,\text{dane})\) jest wyznaczany tak samo:
+\begin{enumerate}
+    \item \texttt{gen} zapisuje plik z~\(R\) zbiorami po \(n\) liczb,
+    \item \texttt{taio} przetwarza cały plik w~jednym uruchomieniu; mierzymy czas \(t\)
+          uruchomienia, a gdy \(t<2\)\,s, pierwsze uruchomienie jest rozgrzewką i~bierzemy
+          medianę z~trzech kolejnych,
+    \item czas na jeden zbiór wynosi \(T=(t-T_0)/R\), gdzie \(T_0\) jest czasem startu
+          programu (mediana z~21 uruchomień na pliku z~jednym zbiorem dwuelementowym);
+          \(R\) zwiększamy, dopóki \(t\geq 0{,}5\)\,s, więc \(T\) jest \textbf{średnim czasem
+          dla zbiorów tej samej wielkości}, a narzut startu procesu jest pomijalny,
+    \item każdy plik wynikowy jest sprawdzany: podzbiory pokrywają zbiór, sumy i~porządek
+          wierszy są poprawne, dla algorytmu aproksymacyjnego \(\Delta\leq a_{\max}\).
+\end{enumerate}
+Czas \(T\) obejmuje wczytanie zbioru, obliczenie i~zapis wyniku. Seria dla algorytmu
+dokładnego kończy się na pierwszym \(n\), dla którego \(T>10\)\,s (w~serii z~kilkoma
+porządkami danych -- dla któregokolwiek z~nich). Stosujemy trzy rodziny
+danych: \texttt{pes} -- rodzina pesymistyczna z~analizy algorytmu dokładnego
+(\(a_1=\cdots=a_{n-1}=k\), \(a_n=k(n+1)\), podział idealny nie istnieje),
+\texttt{los} -- liczby losowe z~\([1,2^b-1]\) z~sumą podzielną przez \(k\) (ostatnia liczba
+korygowana o~mniej niż \(k\)), \texttt{idealny} -- \(k\) grup o~równych sumach wymieszanych
+losowo (podział idealny istnieje, \(\Delta^*=0\)). Dane \texttt{los} i~\texttt{idealny}
+mogą być zapisane w~kolejności losowej, nierosnącej lub niemalejącej; dla tego samego ziarna
+jest to ten sam multizbiór.
+
+Pomiary powtarzamy poleceniami (Windows, PowerShell, w~katalogu ze źródłami; w~systemie
+Linux odpowiednio bez rozszerzenia \texttt{.exe} i~z~\texttt{python3} zamiast \texttt{py}):
+{\footnotesize
+\begin{verbatim}
+gcc -std=c17 -O2 main.c big_uint.c number_sort.c min_heap.c partition.c partition_exact.c -o taio.exe
+gcc -std=c17 -O2 gen.c big_uint.c -o gen.exe
+py bench.py
+\end{verbatim}}
+\noindent Pojedynczą serię można powtórzyć poleceniem \texttt{py bench.py --serie T2}.
+Wyniki trafiają do plików \texttt{wyniki/T1.csv}, \dots, \texttt{wyniki/T5.csv}
+(każdy wiersz zawiera m.in.\ parametry generatora z~ziarnem, \(R\), \(t\), \(T_0\) i~\(T\)).
+Wykresy w~tym dokumencie są rysowane bezpośrednio z~tych plików (pakiet \texttt{pgfplots}),
+więc ponowna kompilacja dokumentu po pomiarach odświeża wykresy. Przedstawione wyniki
+uzyskano na komputerze z~procesorem AMD Ryzen 7 9700X (Windows~11, pomiary w~środowisku
+WSL2 z~Ubuntu 24.04, gcc 13.3, Python 3.12, \(T_0\approx0{,}6\)\,ms). Na innym komputerze
+czasy bezwzględne będą inne, ale kształt zależności pozostaje ten sam.
+
+\pgfplotstableread[col sep=comma]{wyniki/T1.csv}\tabTjeden
+\pgfplotstableread[col sep=comma]{wyniki/T2.csv}\tabTdwa
+\pgfplotstableread[col sep=comma]{wyniki/T3.csv}\tabTtrzy
+
+\subsection{Algorytm dokładny}
+
+Na danych \texttt{pes} algorytm zawsze przegląda wszystkie \(k^n\) kandydatów
+(rys.~\ref{fig:t1}). W~skali logarytmicznej punkty układają się w~proste: zwiększenie \(n\)
+o~jeden wydłuża czas średnio \(2{,}05\), \(3{,}13\), \(4{,}29\) i~\(5{,}31\) razy dla
+\(k=2,3,4,5\), czyli nieco bardziej niż \(k\) razy, bo rośnie też liczba operacji na
+jednego kandydata. Prawy wykres pokazuje czas przypadający na jednego kandydata,
+\(T/k^n\): rośnie on w~przybliżeniu liniowo z~\(n\) (od około 40 do 90\,ns), co odpowiada
+kosztowi \(\Theta(n+k)\) sprawdzenia kandydata i~potwierdza oszacowanie
+\(\Theta\bigl((n+k)\,k^n\bigr)\). Na składnik niezależny od \(n\) składa się m.in.\ obsługa
+\(k\) sum jako liczb dowolnej precyzji, których pamięć w~implementacji jest zwalniana
+i~przydzielana na nowo dla każdego kandydata. Największe \(n\), dla których czas nie
+przekracza 10\,s, wynoszą 26, 17, 13 i~11 odpowiednio dla \(k=2,3,4,5\).
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \begin{semilogyaxis}[dwa, name=lewy, xlabel={liczba elementów \(n\)},
+                ylabel={czas na zbiór \(T\) [s]}, legend pos=north west]
+            \addplot+[discard if not={k}{2}] table[x=n, y=t_na_zbior_s]{\tabTjeden};
+            \addlegendentry{\(k=2\)}
+            \addplot+[discard if not={k}{3}] table[x=n, y=t_na_zbior_s]{\tabTjeden};
+            \addlegendentry{\(k=3\)}
+            \addplot+[discard if not={k}{4}] table[x=n, y=t_na_zbior_s]{\tabTjeden};
+            \addlegendentry{\(k=4\)}
+            \addplot+[discard if not={k}{5}] table[x=n, y=t_na_zbior_s]{\tabTjeden};
+            \addlegendentry{\(k=5\)}
+        \end{semilogyaxis}
+        \begin{axis}[dwa, prawy, xlabel={liczba elementów \(n\)},
+                ylabel={\(T/k^n\) [ns]}, ymin=0]
+            \addplot+[discard if not={k}{2}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1e9/(\thisrow{k}^\thisrow{n})]{\tabTjeden};
+            \addplot+[discard if not={k}{3}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1e9/(\thisrow{k}^\thisrow{n})]{\tabTjeden};
+            \addplot+[discard if not={k}{4}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1e9/(\thisrow{k}^\thisrow{n})]{\tabTjeden};
+            \addplot+[discard if not={k}{5}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1e9/(\thisrow{k}^\thisrow{n})]{\tabTjeden};
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Algorytm dokładny na danych \texttt{pes} (pełny przegląd). Po lewej czas na
+             zbiór w~skali logarytmicznej, po prawej czas przypadający na jednego kandydata.}
+    \label{fig:t1}
+\end{figure}
+
+Na danych losowych \texttt{los} (\(b=20\), czyli wartości do około \(10^6\)) czas zależy
+przede wszystkim od tego, czy podział idealny istnieje (rys.~\ref{fig:t2}). Dla \(k=3\)
+żaden z~badanych zbiorów nie miał podziału idealnego, więc we wszystkich porządkach czas
+jest równy czasowi pełnego przeglądu (linia \texttt{pes}). Dla \(k=2\) do \(n=18\) podział
+idealny ma mniej niż 2\% zbiorów, w~przedziale \(n=19\)--\(24\) odsetek ten szybko rośnie
+(w~próbach po 10--20 zbiorów od 0\% do 100\%), a od \(n=25\) podział idealny mają wszystkie
+zbiory. Algorytm kończy się wtedy na pierwszym znalezionym podziale i~czas rośnie
+znacznie wolniej niż \(2^n\), co pozwoliło dojść do \(n=33\) (pełny przegląd trwałby dla
+tego \(n\) około 15\,min). O~czasie decyduje wówczas kolejność elementów. Dla \(n=33\)
+średni czas wynosi 10,1\,s przy porządku nierosnącym (takim, jakiego używa algorytm
+aproksymacyjny), 1,0\,s przy losowym i~0,48\,s przy niemalejącym. Wynika to z~kolejności
+przeglądania kandydatów: najszybciej zmienia się przydział ostatnich elementów, więc gdy na
+końcu stoją największe liczby, podział o~równych sumach zostaje znaleziony wcześniej.
+Dla największych \(n\) każdy punkt jest średnią z~10 zbiorów, stąd widoczny rozrzut.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \begin{semilogyaxis}[dwa, name=lewy, title={\(k=2\)},
+                xlabel={\(n\)}, ylabel={czas na zbiór \(T\) [s]}, legend pos=north west]
+            \addplot+[discard if not={k}{2}, discard if not={porzadek}{los}]
+                table[x=n, y=t_na_zbior_s]{\tabTdwa};
+            \addlegendentry{losowy}
+            \addplot+[discard if not={k}{2}, discard if not={porzadek}{nier}]
+                table[x=n, y=t_na_zbior_s]{\tabTdwa};
+            \addlegendentry{nierosnący}
+            \addplot+[discard if not={k}{2}, discard if not={porzadek}{niem}]
+                table[x=n, y=t_na_zbior_s]{\tabTdwa};
+            \addlegendentry{niemalejący}
+            \addplot[gray, dashed, discard if not={k}{2}]
+                table[x=n, y=t_na_zbior_s]{\tabTjeden};
+            \addlegendentry{\texttt{pes}}
+        \end{semilogyaxis}
+        \begin{semilogyaxis}[dwa, prawy, title={\(k=3\)}, xlabel={\(n\)},
+                ylabel={\(T\) [s]}, legend pos=north west]
+            \addplot+[discard if not={k}{3}, discard if not={porzadek}{los}]
+                table[x=n, y=t_na_zbior_s]{\tabTdwa};
+            \addlegendentry{losowy}
+            \addplot+[discard if not={k}{3}, discard if not={porzadek}{nier}]
+                table[x=n, y=t_na_zbior_s]{\tabTdwa};
+            \addlegendentry{nierosnący}
+            \addplot+[discard if not={k}{3}, discard if not={porzadek}{niem}]
+                table[x=n, y=t_na_zbior_s]{\tabTdwa};
+            \addlegendentry{niemalejący}
+            \addplot[gray, dashed, discard if not={k}{3}]
+                table[x=n, y=t_na_zbior_s]{\tabTjeden};
+            \addlegendentry{\texttt{pes}}
+        \end{semilogyaxis}
+    \end{tikzpicture}
+    \caption{Algorytm dokładny na danych \texttt{los} (\(b=20\)) w~trzech porządkach
+             wejścia; linia przerywana -- dane \texttt{pes} z~rys.~\ref{fig:t1}. Dla \(k=3\)
+             wszystkie krzywe pokrywają się.}
+    \label{fig:t2}
+\end{figure}
+
+\subsection{Algorytm aproksymacyjny}
+
+W~wymaganym zakresie \(5\leq n\leq 200\) (rys.~\ref{fig:t3}, po lewej) czas na zbiór
+rośnie praktycznie liniowo, od około 1,6\,\(\mu\)s dla \(n=5\) do 54--59\,\(\mu\)s dla
+\(n=200\). Wpływ \(k\) jest mały: dla \(k=10\) czas jest zwykle o~kilka do kilkunastu
+procent dłuższy niż dla \(k=2\). Dane już posortowane nierosnąco są przetwarzane zwykle
+o~10--15\% szybciej. Prawy wykres obejmuje zakres do
+\(n=10^6\); linia przerywana to \(c\,n\log_2 n\) ze stałą \(c=20{,}65\)\,ns dobraną tak,
+aby przechodziła przez punkt \(n=10^5\). Tabela~\ref{tab:t3} podaje iloraz
+\(T/(n\log_2 n)\) dla wybranych \(n\).
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{rrrrr}
+        \toprule
+        & \multicolumn{2}{c}{\(T\) [ms]} & \multicolumn{2}{c}{\(T/(n\log_2 n)\) [ns]} \\
+        \(n\) & dane losowe & posortowane & dane losowe & posortowane \\
+        \midrule
+        \(10^3\) & 0,284 & 0,227 & 28,5 & 22,8 \\
+        \(10^4\) & 3,03 & 2,27 & 22,8 & 17,1 \\
+        \(10^5\) & 34,3 & 23,5 & 20,7 & 14,1 \\
+        \(10^6\) & 664 & 271 & 33,3 & 13,6 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Algorytm aproksymacyjny, \(k=3\), \(b=64\): czas na zbiór dla dużych \(n\).}
+    \label{tab:t3}
+\end{table}
+
+Iloraz \(T/(n\log_2 n)\) maleje aż do \(n\approx2\cdot10^5\), bo w~mierzonym czasie
+przeważa składnik liniowy: wczytanie i~zapis liczb w~postaci dziesiętnej oraz przydział
+pamięci dla każdej liczby. Sam składnik \(n\log n\) (sortowanie) jest więc w~tym zakresie
+słabo widoczny. Dla danych losowych przy \(n\geq5\cdot10^5\) iloraz rośnie, a dla danych
+posortowanych pozostaje stały (około 13,5\,ns). Przyczyną są najpewniej chybienia w~pamięci
+podręcznej podczas sortowania losowo ułożonych liczb, a nie sam algorytm. Pomiary są
+zgodne z~oszacowaniem \(O\bigl(n\log n\,(b+\log n)\bigr)\), a zbiór z~milionem liczb
+algorytm przetwarza w~czasie poniżej 1\,s.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[dwa, name=lewy, xlabel={\(n\)}, ylabel={czas na zbiór \(T\) [ms]},
+                restrict x to domain=0:200, xmin=0, xmax=205, ymin=0, legend pos=north west]
+            \addplot+[mark size=1pt, discard if not={k}{2}, discard if not={porzadek}{los}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1000]{\tabTtrzy};
+            \addlegendentry{\(k=2\)}
+            \addplot+[mark size=1pt, discard if not={k}{3}, discard if not={porzadek}{los}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1000]{\tabTtrzy};
+            \addlegendentry{\(k=3\)}
+            \addplot+[mark size=1pt, discard if not={k}{10}, discard if not={porzadek}{los}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1000]{\tabTtrzy};
+            \addlegendentry{\(k=10\)}
+            \addplot+[mark size=1pt, discard if not={k}{3}, discard if not={porzadek}{nier}]
+                table[x=n, y expr=\thisrow{t_na_zbior_s}*1000]{\tabTtrzy};
+            \addlegendentry{\(k=3\), posortowane}
+        \end{axis}
+        \begin{loglogaxis}[dwa, prawy, xlabel={\(n\)}, ylabel={\(T\) [s]},
+                legend pos=north west]
+            \addplot+[mark size=1pt, discard if not={k}{3}, discard if not={porzadek}{los}]
+                table[x=n, y=t_na_zbior_s]{\tabTtrzy};
+            \addlegendentry{\(k=3\)}
+            \addplot+[mark size=1pt, discard if not={k}{3}, discard if not={porzadek}{nier}]
+                table[x=n, y=t_na_zbior_s]{\tabTtrzy};
+            \addlegendentry{\(k=3\), posortowane}
+            % n = 10^x, c n log2 n = 20,65 ns * 10^x * x * log2(10)
+            \addplot[black, dashed, domain=0.7:6, samples=30]
+                ({10^x}, {2.065e-8*3.321928*x*10^x});
+            \addlegendentry{\(c\,n\log_2 n\)}
+        \end{loglogaxis}
+    \end{tikzpicture}
+    \caption{Algorytm aproksymacyjny na danych \texttt{los} (\(b=64\)): po lewej zakres
+             \(5\leq n\leq 200\), po prawej \(5\leq n\leq 10^6\) w~skali log-log.}
+    \label{fig:t3}
+\end{figure}
+
+Tabela~\ref{tab:t4} pokazuje wpływ długości liczb \(b\) przy \(n=10^5\) i~\(k=3\).
+Do \(b=256\) czas rośnie wolniej niż liniowo, bo przeważają koszty niezależne od \(b\),
+a powyżej szybciej: podwojenie \(b\) z~512 do 1024 wydłuża czas 2,6 razy. Wynika to
+z~zamiany zapisu dziesiętnego na binarny i~z~powrotem przy wczytywaniu i~zapisie. Koszt
+tej zamiany dla jednej liczby rośnie jak \(b^2\), podczas gdy operacje samego algorytmu
+(porównania i~dodawania sum) mają koszt \(O(b)\).
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{lrrrrrrr}
+        \toprule
+        \(b\) [bity] & 16 & 32 & 64 & 128 & 256 & 512 & 1024 \\
+        \midrule
+        \(T\) [ms] & 23,3 & 27,5 & 35,0 & 48,6 & 84,6 & 187,5 & 494,6 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Algorytm aproksymacyjny, \(n=10^5\), \(k=3\), dane \texttt{los}: czas na zbiór
+             w~zależności od długości liczb (\texttt{wyniki/T4.csv}).}
+    \label{tab:t4}
+\end{table}
+
+\subsection{Jakość rozwiązań algorytmu aproksymacyjnego}
+
+Na danych \texttt{idealny} (\(b=30\), po 100 zbiorów dla każdego \(n\)) podział idealny
+istnieje z~konstrukcji, czyli \(\Delta^*=0\). Algorytm aproksymacyjny znajduje go jednak
+tylko w~6\% (\(k=2\)) i~5\% (\(k=3\)) zbiorów dla \(n=10\), a dla \(n\geq20\) w~żadnym
+(tab.~\ref{tab:t5}). Średni iloraz \(\Delta_{\mathrm{alg}}/a_{\max}\) jest natomiast mały
+i~maleje w~przybliżeniu jak \(1/n\), więc gwarancja \(\Delta_{\mathrm{alg}}\leq a_{\max}\)
+jest w~praktyce spełniona z~dużym zapasem. Z~kolei algorytm dokładny zawsze znajduje
+podział idealny, jeśli on istnieje, ale tylko dla niewielkich \(n\).
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{lrrrrr}
+        \toprule
+        \(n\) & 10 & 20 & 50 & 100 & 200 \\
+        \midrule
+        \(k=2\): średnie \(\Delta_{\mathrm{alg}}/a_{\max}\) & 0,080 & 0,042 & 0,015 & 0,0069 & 0,0034 \\
+        \(k=2\): zbiory z~\(\Delta_{\mathrm{alg}}=0\) & 6\% & 0\% & 0\% & 0\% & 0\% \\
+        \(k=3\): średnie \(\Delta_{\mathrm{alg}}/a_{\max}\) & 0,127 & 0,084 & 0,029 & 0,013 & 0,0073 \\
+        \(k=3\): zbiory z~\(\Delta_{\mathrm{alg}}=0\) & 5\% & 0\% & 0\% & 0\% & 0\% \\
+        \bottomrule
+    \end{tabular}
+    \caption{Jakość algorytmu aproksymacyjnego na danych z~podziałem idealnym
+             (\(\Delta^*=0\), \texttt{wyniki/T5.csv}).}
+    \label{tab:t5}
+\end{table}
+
+
+\section{TODO: Wnioski}
+
+\section{TODO: podział pracy}
+
+\end{document}

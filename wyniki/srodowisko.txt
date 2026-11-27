@@ -1,0 +1,9 @@
+data: 2026-11-27T09:48:21
+system: Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+procesor: AMD Ryzen 7 9700X 8-Core Processor
+python: 3.12.3
+gcc: gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+T0_s: 0.000607
+tmax_s: 10.0
+pilot: False
+serie: T1 T2 T3 T4 T5
