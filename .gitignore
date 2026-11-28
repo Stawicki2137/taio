@@ -6,3 +6,5 @@ taio
 gen
 robocze/
 __pycache__/
+!/Exe/*.exe
+!/Exe/*.dll
