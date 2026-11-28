@@ -3,3 +3,5 @@
 *.obj
 *.dll
 taio
+!/Exe/*.exe
+!/Exe/*.dll

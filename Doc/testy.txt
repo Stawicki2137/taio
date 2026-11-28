@@ -1,0 +1,77 @@
+Dane testowe TAIO
+
+Polecenia uruchamiaj z katalogu TAIO, po skompilowaniu programu.
+Każdy plik ma w pierwszym wierszu liczbę zbiorów. Jeden kolejny wiersz
+opisuje jeden zbiór, z pojedynczymi spacjami między liczbami.
+W nazwie pliku k2, k3 lub k5 wskazuje parametr k używany do porównania.
+
+Pliki w folderze Examples/testy_poprawnosci/oczekiwane zawierają pełne wzorcowe wyniki.
+Zostały wyznaczone niezależnie i porównane z programem C.
+Wyniki uruchomień programu powstają bezpośrednio w folderze Examples/testy_poprawnosci.
+W trybie D BRAK oznacza brak podziału idealnego lub n < k.
+
+Dane dla D mają najwyżej 8 elementów w zbiorze i k <= 4.
+Największy przegląd ma najwyżej 4^8 = 65536 przypisań.
+Plik aproksymacja_wieksze_k5 jest przeznaczony do trybu A.
+
+aproksymacja_k2.txt
+.\Exe\taio.exe A .\Examples\testy_poprawnosci\aproksymacja_k2.txt 2
+  Zbiór 1 — n = k, jednakowe wartości. Oczekiwane różnica 0.
+  Zbiór 2 — same zera, niepuste części. Oczekiwane różnica 0.
+  Zbiór 3 — A daje różnicę 2, choć istnieje podział idealny. Oczekiwane różnica 2.
+  Zbiór 4 — wejście rosnące, nieparzysta suma. Oczekiwane różnica 1.
+  Zbiór 5 — przeniesienie przez granicę 32 bitów. Oczekiwane różnica 0.
+  Zbiór 6 — sumy przekraczają 64 bity. Oczekiwane różnica 0.
+  Zbiór 7 — liczby 100-cyfrowe i zera. Oczekiwane różnica 0.
+
+aproksymacja_k3.txt
+.\Exe\taio.exe A .\Examples\testy_poprawnosci\aproksymacja_k3.txt 3
+  Zbiór 1 — kolejność wierszy leksykograficzna różni się od kolejności sum. Oczekiwane różnica 4.
+  Zbiór 2 — rozstrzygnięcie kolejności przez drugi element. Oczekiwane różnica 4.
+  Zbiór 3 — wspólny prefiks i różne długości podzbiorów. Oczekiwane różnica 0.
+  Zbiór 4 — przykład z opisu algorytmu, różnica 2. Oczekiwane różnica 2.
+  Zbiór 5 — powtórzenia i idealny podział. Oczekiwane różnica 0.
+  Zbiór 6 — n = k, numeryczne porównanie 10 i 9. Oczekiwane różnica 8.
+  Zbiór 7 — jeden dominujący element. Oczekiwane różnica 997.
+  Zbiór 8 — duże liczby różniące się na końcu. Oczekiwane różnica 0.
+
+aproksymacja_wieksze_k5.txt
+.\Exe\taio.exe A .\Examples\testy_poprawnosci\aproksymacja_wieksze_k5.txt 5
+  Zbiór 1 — 1000 liczb rosnących, długi wiersz wejścia. Oczekiwane różnica 0.
+  Zbiór 2 — 1003 jednakowe wartości, nierówne liczności części. Oczekiwane różnica 7.
+  Zbiór 3 — 1000 wartości, w tym 500 liczb 100-cyfrowych. Oczekiwane różnica 0.
+
+dokladny_k2.txt
+.\Exe\taio.exe D .\Examples\testy_poprawnosci\dokladny_k2.txt 2
+  Zbiór 1 — n = k, rozwiązanie istnieje. Oczekiwane różnica 0.
+  Zbiór 2 — idealny podział pomijany przez aproksymację. Oczekiwane różnica 0.
+  Zbiór 3 — nieposortowane składniki podziału idealnego. Oczekiwane różnica 0.
+  Zbiór 4 — liczniki zapewniają niepustość części. Oczekiwane różnica 0.
+  Zbiór 5 — wiele rozwiązań, wybór pierwszego. Oczekiwane różnica 0.
+  Zbiór 6 — niepodzielna suma, szybkie BRAK. Oczekiwane BRAK.
+  Zbiór 7 — suma podzielna, pełny przegląd bez rozwiązania. Oczekiwane BRAK.
+  Zbiór 8 — element większy od połowy sumy, pełny przegląd. Oczekiwane BRAK.
+  Zbiór 9 — n < k. Oczekiwane BRAK.
+  Zbiór 10 — podział idealny i przeniesienie 64-bitowe. Oczekiwane różnica 0.
+  Zbiór 11 — podział idealny na liczbach 100-cyfrowych. Oczekiwane różnica 0.
+
+dokladny_k3.txt
+.\Exe\taio.exe D .\Examples\testy_poprawnosci\dokladny_k3.txt 3
+  Zbiór 1 — trzy pary o sumie 7. Oczekiwane różnica 0.
+  Zbiór 2 — pierwszy dopuszczalny podział samych zer. Oczekiwane różnica 0.
+  Zbiór 3 — n = k, równe wartości. Oczekiwane różnica 0.
+  Zbiór 4 — suma podzielna, brak podziału idealnego. Oczekiwane BRAK.
+  Zbiór 5 — suma niepodzielna przez k. Oczekiwane BRAK.
+  Zbiór 6 — n < k. Oczekiwane BRAK.
+  Zbiór 7 — trzy duże równe sumy. Oczekiwane różnica 0.
+  Zbiór 8 — rozwiązanie z zerami i kolejność wyniku. Oczekiwane różnica 0.
+
+dokladny_k4.txt
+.\Exe\taio.exe D .\Examples\testy_poprawnosci\dokladny_k4.txt 4
+  Zbiór 1 — n = k, rozwiązanie istnieje. Oczekiwane różnica 0.
+  Zbiór 2 — cztery pary o sumie 9. Oczekiwane różnica 0.
+  Zbiór 3 — wszystkie części muszą być niepuste. Oczekiwane różnica 0.
+  Zbiór 4 — suma podzielna, pełny przegląd bez rozwiązania. Oczekiwane BRAK.
+  Zbiór 5 — n < k. Oczekiwane BRAK.
+  Zbiór 6 — podział dużych liczb. Oczekiwane różnica 0.
+
